@@ -3,20 +3,26 @@ package com.pm.leetpain.controller;
 import com.pm.leetpain.Domain.PartialProblem;
 import com.pm.leetpain.Domain.Problem;
 import com.pm.leetpain.Domain.Submission;
+import com.pm.leetpain.config.RabbitMQConfig;
 import com.pm.leetpain.service.ProblemService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Random;
+import java.util.UUID;
 
 @Slf4j
 @RestController
 public class ProblemController {
     private final ProblemService problemService;
+    private final RabbitTemplate rabbitTemplate;
 
-    public ProblemController(ProblemService problemService) {
+    public ProblemController(ProblemService problemService, RabbitTemplate rabbitTemplate) {
         this.problemService = problemService;
+        this.rabbitTemplate = rabbitTemplate;
     }
 
     @GetMapping("/problem/{id}")
@@ -42,8 +48,15 @@ public class ProblemController {
         if (request.solution() == null || request.solution().isBlank()) {
             return ResponseEntity.badRequest().body(null);
         }
-        Submission submission = problemService.submitSolution(id, request.solution(), request.language());
-        return ResponseEntity.ok(submission);
+        Random random = new Random();
+
+        // Generates a random long between Long.MIN_VALUE and Long.MAX_VALUE
+        long submissionId = random.nextLong();
+
+
+        rabbitTemplate.convertAndSend(RabbitMQConfig.EXCHANGE_NAME, RabbitMQConfig.ROUTING_KEY, new Submission(submissionId,id, request.language(), request.solution()));
+        Submission response = new Submission(id, Submission.Status.QUEUED);
+        return ResponseEntity.ok(response);
     }
 
     public record SubmitRequest(String solution, String language) {}

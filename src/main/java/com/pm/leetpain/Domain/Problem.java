@@ -103,7 +103,8 @@ public class Problem {
 
     public enum Language {
         CPP,
-        JAVA
+        JAVA,
+        PYTHON
     }
 
 
