@@ -2,15 +2,15 @@ package com.pm.leetpain.controller;
 
 import com.pm.leetpain.Domain.PartialProblem;
 import com.pm.leetpain.Domain.Problem;
+import com.pm.leetpain.Domain.Submission;
 import com.pm.leetpain.service.ProblemService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Slf4j
 @RestController
 public class ProblemController {
     private final ProblemService problemService;
@@ -21,6 +21,7 @@ public class ProblemController {
 
     @GetMapping("/problem/{id}")
     public ResponseEntity<Problem> getProblemById(@PathVariable long id) {
+
         if(id <= 0) {
             return ResponseEntity.badRequest().body(null);
         }
@@ -33,7 +34,17 @@ public class ProblemController {
     }
 
     @PostMapping("/problem/{id}/submit")
-    public ResponseEntity<String> submitSolution(@PathVariable long id, String solution) {
-        return ResponseEntity.ok("Solution submitted for problem " + id);
+    public ResponseEntity<Submission> submitSolution(@PathVariable long id, @RequestBody SubmitRequest request) {
+        log.debug("Received submission request for problem id {}: {}", id, request);
+        if (request == null || request.language() == null || request.language().isBlank()) {
+            return ResponseEntity.badRequest().body(null);
+        }
+        if (request.solution() == null || request.solution().isBlank()) {
+            return ResponseEntity.badRequest().body(null);
+        }
+        Submission submission = problemService.submitSolution(id, request.solution(), request.language());
+        return ResponseEntity.ok(submission);
     }
+
+    public record SubmitRequest(String solution, String language) {}
 }

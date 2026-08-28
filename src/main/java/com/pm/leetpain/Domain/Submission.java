@@ -8,7 +8,6 @@ import java.time.LocalDateTime;
 
 @Getter
 @Setter
-@Builder
 public class Submission {
 
     private Long id;
@@ -33,6 +32,11 @@ public class Submission {
     private LocalDateTime submittedAt;
 
     private LocalDateTime completedAt;
+
+    public Submission(Long problemId, Status status) {
+        this.problemId = problemId;
+        this.status = status;
+    }
 
     public enum Status {
         QUEUED,
