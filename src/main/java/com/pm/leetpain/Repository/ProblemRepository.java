@@ -35,6 +35,7 @@ public class ProblemRepository {
                        difficulty,
                        test_cases,
                        language_stubs,
+                       driver_harnesses,
                        created_at,
                        updated_at
                 FROM problems
@@ -58,6 +59,7 @@ public class ProblemRepository {
                        difficulty,
                        test_cases,
                        language_stubs,
+                       driver_harnesses,
                        created_at,
                        updated_at
                 FROM problems
@@ -65,6 +67,34 @@ public class ProblemRepository {
                 """;
 
         return jdbcTemplate.query(query, this::mapProblem);
+    }
+
+    public Problem save(Problem problem) throws SQLException {
+        try {
+            String testCasesJson = objectMapper.writeValueAsString(problem.getTestCases() == null ? List.of() : problem.getTestCases());
+            String stubsJson = objectMapper.writeValueAsString(problem.getLanguageStubs() == null ? Map.of() : problem.getLanguageStubs());
+            String driverHarnessesJson = objectMapper.writeValueAsString(problem.getDriverHarnesses() == null ? Map.of() : problem.getDriverHarnesses());
+
+            if (problem.getId() == null) {
+                String insert = "INSERT INTO problems (title, slug, description, difficulty, test_cases, language_stubs, driver_harnesses) VALUES (?, ?, ?, ?, ?::jsonb, ?::jsonb, ?::jsonb) RETURNING id, created_at, updated_at";
+                return jdbcTemplate.queryForObject(
+                        insert,
+                        (rs, rowNum) -> {
+                            problem.setId(rs.getLong("id"));
+                            problem.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
+                            problem.setUpdatedAt(rs.getTimestamp("updated_at").toLocalDateTime());
+                            return problem;
+                        },
+                        problem.getTitle(), problem.getSlug(), problem.getDescription(), problem.getDifficulty().name(), testCasesJson, stubsJson, driverHarnessesJson
+                );
+            } else {
+                String update = "UPDATE problems SET title = ?, slug = ?, description = ?, difficulty = ?, test_cases = ?::jsonb, language_stubs = ?::jsonb, driver_harnesses = ?::jsonb, updated_at = now() WHERE id = ?";
+                jdbcTemplate.update(update, problem.getTitle(), problem.getSlug(), problem.getDescription(), problem.getDifficulty().name(), testCasesJson, stubsJson, driverHarnessesJson, problem.getId());
+                return problem;
+            }
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            throw new SQLException("Failed to serialize problem JSON", e);
+        }
     }
 
     private Problem mapProblem(ResultSet rs, int rowNum)
@@ -82,6 +112,11 @@ public class ProblemRepository {
                             rs.getString("language_stubs"),
                             new TypeReference<Map<Problem.Language, String>>() {}
                     );
+            Map<Problem.Language, String> driverHarnesses =
+                    objectMapper.readValue(
+                            rs.getString("driver_harnesses"),
+                            new TypeReference<Map<Problem.Language, String>>() {}
+                    );
 
             Problem problem = new Problem();
             problem.setId(rs.getLong("id"));
@@ -95,6 +130,7 @@ public class ProblemRepository {
             );
             problem.setTestCases(testCases);
             problem.setLanguageStubs(languageStubs);
+            problem.setDriverHarnesses(driverHarnesses);
             problem.setCreatedAt(
                     rs.getTimestamp("created_at")
                             .toLocalDateTime()

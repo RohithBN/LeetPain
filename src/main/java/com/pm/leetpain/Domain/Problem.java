@@ -25,6 +25,7 @@ public class Problem {
     private List<TestCase> testCases;
 
     private Map<Language, String> languageStubs;
+    private Map<Language, String> driverHarnesses;
 
     public Long getId() {
         return id;
@@ -60,6 +61,10 @@ public class Problem {
 
     public Map<Language, String> getLanguageStubs() {
         return languageStubs;
+    }
+
+    public Map<Language, String> getDriverHarnesses() {
+        return driverHarnesses;
     }
 
     public Problem() {
@@ -99,6 +104,10 @@ public class Problem {
 
     public void setLanguageStubs(Map<Language, String> languageStubs) {
         this.languageStubs = languageStubs;
+    }
+
+    public void setDriverHarnesses(Map<Language, String> driverHarnesses) {
+        this.driverHarnesses = driverHarnesses;
     }
 
     public enum Language {

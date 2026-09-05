@@ -5,22 +5,24 @@ import com.pm.leetpain.Domain.PartialProblem;
 import com.pm.leetpain.Domain.Problem;
 import com.pm.leetpain.Domain.Submission;
 import com.pm.leetpain.Repository.ProblemRepository;
-import com.pm.leetpain.judge.JavaRuntimeExecutor;
 import com.pm.leetpain.judge.RuntimeExecutor;
 import com.pm.leetpain.mapper.ProblemMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 @Service
 public class ProblemService {
+    private static final Logger log = LoggerFactory.getLogger(ProblemService.class);
 
     private final ProblemRepository problemRepository;
-    private final JavaRuntimeExecutor javaRuntimeExecutor;
+    private final RuntimeExecutor runtimeExecutor;
 
-    public ProblemService(ProblemRepository problemRepository, JavaRuntimeExecutor javaRuntimeExecutor) {
+    public ProblemService(ProblemRepository problemRepository, RuntimeExecutor runtimeExecutor) {
         this.problemRepository = problemRepository;
-        this.javaRuntimeExecutor = javaRuntimeExecutor;
+        this.runtimeExecutor = runtimeExecutor;
     }
 
     public Problem getProblemById(long id){
@@ -36,23 +38,48 @@ public class ProblemService {
                 .toList();
     }
 
+    public Problem saveProblem(Problem problem) {
+        try {
+            return problemRepository.save(problem);
+        } catch (Exception e) {
+            log.error("Failed to save problem: {}", e.getMessage());
+            throw new RuntimeException(e);
+        }
+    }
+
     public Submission submitSolution(long problemId , String solution , String language){
         // get the problem
         Problem problem = problemRepository.findById(problemId)
                 .orElseThrow(() -> new IllegalArgumentException("Problem not found"));
-        // create a new submission
-        RuntimeExecutor runtimeExecutor = getRuntimeExecutor(language);
-        ExecutionResult result = runtimeExecutor.execute(solution, language, problem);
-        Submission submission = new Submission(problemId, result.getStderr().isEmpty()? Submission.Status.ACCEPTED: Submission.Status.COMPILATION_ERROR);
-        return submission;
+        // execute
+        try {
+            ExecutionResult result = runtimeExecutor.execute(solution, language, problem);
+            Submission submission = new Submission(problemId, mapResultToStatus(result));
+            return submission;
+        } catch (Exception e) {
+           log.error("Error executing solution for problem id {}: {}", problemId, e.getMessage());
+            Submission submission = new Submission(problemId, Submission.Status.COMPILATION_ERROR);
+            return submission;
+
+        }
     }
 
-
-    public RuntimeExecutor getRuntimeExecutor(String language) {
-        return switch (language.toLowerCase()) {
-            case "java" -> javaRuntimeExecutor;
-            default -> throw new IllegalArgumentException("Unsupported language: " + language);
+    private Submission.Status mapResultToStatus(ExecutionResult result) {
+        if (result == null) return Submission.Status.RUNTIME_ERROR;
+        if (result.getCompileError() != null) {
+            String ce = result.getCompileError();
+            if ("COMPILATION_ERROR".equals(ce)) return Submission.Status.COMPILATION_ERROR;
+            if ("TIME_LIMIT_EXCEEDED".equals(ce)) return Submission.Status.TIME_LIMIT_EXCEEDED;
+            return Submission.Status.RUNTIME_ERROR;
+        }
+        String status = result.getStatus();
+        if (status == null) return Submission.Status.RUNTIME_ERROR;
+        return switch (status) {
+            case "ACCEPTED" -> Submission.Status.ACCEPTED;
+            case "WRONG_ANSWER" -> Submission.Status.WRONG_ANSWER;
+            default -> Submission.Status.RUNTIME_ERROR;
         };
     }
+
 
 }

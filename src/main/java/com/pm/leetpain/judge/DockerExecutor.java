@@ -11,9 +11,11 @@ import com.github.dockerjava.core.command.LogContainerResultCallback;
 import com.github.dockerjava.core.command.WaitContainerResultCallback;
 import com.github.dockerjava.zerodep.ZerodepDockerHttpClient;
 import com.pm.leetpain.Domain.ExecutionResult;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -23,9 +25,9 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
 
-@Slf4j
 @Component
 public class DockerExecutor {
+    private static final Logger log = LoggerFactory.getLogger(DockerExecutor.class);
 
     private final DockerClient dockerClient;
 
@@ -87,6 +89,10 @@ public class DockerExecutor {
         CreateContainerResponse response = dockerClient.createContainerCmd(imageName)
                 .withCmd("sh", "-c", command)
                 .withHostConfig(hostConfig)
+                .withAttachStdin(true)
+                .withAttachStdout(true)
+                .withAttachStderr(true)
+                .withStdinOpen(true)
                 .exec();
         return response;
     }
@@ -185,4 +191,56 @@ public class DockerExecutor {
         );
         }
 
+        public ExecutionResult runContainerWithInput(String containerId , String input , long timeoutSeconds) {
+        ExecutionResult result = new ExecutionResult();
+        ByteArrayOutputStream stdoutStream = new ByteArrayOutputStream();
+        ByteArrayOutputStream stderrStream = new ByteArrayOutputStream();
+        try{
+            ByteArrayInputStream inputStream = new ByteArrayInputStream(input != null ? input.getBytes(StandardCharsets.UTF_8) : new byte[0]);
+            ResultCallback.Adapter<Frame> callback = new ResultCallback.Adapter<>(){
+                @Override
+                public void onNext(Frame item){
+                    try {
+                        if(item.getStreamType() == StreamType.STDOUT) {
+                            stdoutStream.write(item.getPayload());
+                        } else if(item.getStreamType() == StreamType.STDERR) {
+                            stderrStream.write(item.getPayload());
+                        }
+                    } catch (IOException ignored) {
+                    }
+                }
+            };
+            dockerClient.attachContainerCmd(containerId)
+                    .withFollowStream(true)
+                    .withStdOut(true)
+                    .withStdErr(true)
+                    .withStdIn(inputStream)
+                    .exec(callback);
+
+            dockerClient.startContainerCmd(containerId).exec();
+            Integer exitCode = waitForContainer(containerId, timeoutSeconds);
+
+            if (exitCode == null) { // Timed Out
+                killContainer(containerId);
+                result.setTimedOut(true);
+                result.setExitCode(-1);
+            } else {
+                result.setTimedOut(false);
+                result.setExitCode(exitCode);
+            }
+
+            // Close stream callback
+            callback.awaitCompletion(timeoutSeconds, TimeUnit.SECONDS);
+
+            result.setStdout(stdoutStream.toString(StandardCharsets.UTF_8));
+            result.setStderr(stderrStream.toString(StandardCharsets.UTF_8));
+
+
+
+        } catch (InterruptedException e) {
+            result.setExitCode(-1);
+            result.setStderr("Container execution failed: " + e.getMessage());
+        }
+        return result;
+        }
 }

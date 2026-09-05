@@ -5,18 +5,18 @@ import com.pm.leetpain.Domain.Problem;
 import com.pm.leetpain.Domain.Submission;
 import com.pm.leetpain.config.RabbitMQConfig;
 import com.pm.leetpain.service.ProblemService;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Random;
-import java.util.UUID;
 
-@Slf4j
 @RestController
 public class ProblemController {
+    private static final Logger log = LoggerFactory.getLogger(ProblemController.class);
     private final ProblemService problemService;
     private final RabbitTemplate rabbitTemplate;
 
@@ -37,6 +37,19 @@ public class ProblemController {
     @GetMapping({"/problem", "/problems"})
     public ResponseEntity<List<PartialProblem>> getAllProblems() {
         return ResponseEntity.ok(problemService.getAllProblems());
+    }
+
+    @PostMapping("/problem")
+    public ResponseEntity<Problem> createProblem(@RequestBody Problem problem) {
+        Problem saved = problemService.saveProblem(problem);
+        return ResponseEntity.ok(saved);
+    }
+
+    @PutMapping("/problem/{id}")
+    public ResponseEntity<Problem> updateProblem(@PathVariable long id, @RequestBody Problem problem) {
+        problem.setId(id);
+        Problem saved = problemService.saveProblem(problem);
+        return ResponseEntity.ok(saved);
     }
 
     @PostMapping("/problem/{id}/submit")

@@ -5,7 +5,45 @@ public class ExecutionResult {
     private int exitCode;
     private String stdout;
     private String stderr;
-    private boolean compileError;
+    private String compileError;
+    private String ExpectedOutput;
+
+    public String getExpectedOutput() {
+        return ExpectedOutput;
+    }
+
+    public void setExpectedOutput(String expectedOutput) {
+        ExpectedOutput = expectedOutput;
+    }
+
+    public String getActualOutput() {
+        return ActualOutput;
+    }
+
+    public void setActualOutput(String actualOutput) {
+        ActualOutput = actualOutput;
+    }
+
+    public String getStatus() {
+        return Status;
+    }
+
+    public void setStatus(String status) {
+        Status = status;
+    }
+
+    private String ActualOutput;
+    private String Status;
+
+    public Integer getFailedTestCaseIndex() {
+        return failedTestCaseIndex;
+    }
+
+    public void setFailedTestCaseIndex(Integer failedTestCaseIndex) {
+        this.failedTestCaseIndex = failedTestCaseIndex;
+    }
+
+    private Integer failedTestCaseIndex;
 
     public ExecutionResult(String stdout, String stderr) {
         this.stdout = stdout;
@@ -48,11 +86,11 @@ public class ExecutionResult {
         this.stderr = stderr;
     }
 
-    public boolean isCompileError() {
+    public String getCompileError() {
         return compileError;
     }
 
-    public void setCompileError(boolean compileError) {
+    public void setCompileError(String compileError) {
         this.compileError = compileError;
     }
 }
